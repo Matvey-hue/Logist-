@@ -1,0 +1,101 @@
+#include <iostream>
+#include <Windows.h>
+#include <string>
+#include <conio.h>
+using namespace std;
+short path[6], pathx[1000000][12]; int I = 0;
+void F(int x, int b, int townarr, int table[][1500], int count_town, float S) {
+	for (int i = b; i < 6; i++) path[i] = 0;
+	path[b] = x;
+	if (b == 5 || x == townarr) { // Дошли до максимума рекурсии (лимит рекурсии или финальный город)
+		if (path[b] == townarr) {
+			for (int i = 0; i < 6; i++) { 
+				pathx[I][i] = path[i]; 
+				if (i < 5 && path[i + 1] != 0) { pathx[I][i + 6] = table[path[i]][path[i + 1]]; pathx[I][11] += pathx[I][i + 6]; }
+			}
+			I++; // сохраняем полученный маршрут
+		}
+		return;
+	}
+	bool OKK = false;  // Проверка на случай, если вообще никуда сделать ход невозможно (нет дороги, нет топлива) => выходим из рекурсии
+	for (int i = 1; i <= count_town; i++) {
+		for (int j = b + 1; j < 6; j++) path[j] = 0;
+		bool OK = true;
+		for (int j : path) {
+			if (j == i) { OK = false; break; }
+		}
+		if (table[x][i] <= S && table[x][i] != -1 && OK == true) { OKK = true; F(i, b + 1, townarr, table, count_town, S); }  // если до ближайшего города можно доехать - делаем ход
+	}
+	if (OKK == false) return;
+}
+void Route_s(int towndep, int townarr, int table[][1500], int count_town, int car[][5], int count_car, short* settings)
+{ // towndep - город отправления [код], townarr - город прибытия [код], table - таблица расстояний, count_town - количество городов в таблице, car - таблица (характеристика доступных автомобилей), count_car - количество автомобилей, settings - настройки опроса
+	if (towndep == townarr) return;  // Совпадение городов - отказ в составлении маршрута
+	int M = 0; cout << "Введите массу груза: "; cin >> M;
+	long long timedep = 0, timearr = 0;  // Дата и время отправления; прибытия с 01.01.1900 00:00
+	//if (settings[0] == 1) {  // Спрашиваем дату и время отправления; прибытия
+	//	cout << "Задать дату и время:" << endl << "1. Отправления" << endl << "2. Прибытия" << endl << "3. Не задавать" << endl << "Ваш выбор: "; char ch = _getch();
+	//	if (ch == 1) {
+	//		cout << "Введите дату отправления в формате ДД.ММ.ГГГГ:";
+	//		cout << "Введите время отправления:";
+	//	}
+	//}
+	//if (settings[1] == 1) {  // Спрашиваем: какие водители могут выполнить этот заказ (по умолчанию - все в БД);
+	//	// Выбрать: 1. Какие...; 2. Все, кроме...
+	//}
+	// Отбор автомобилей по условию: ГП >= M
+	for (int i = 0; i < count_car; i++) {
+		if (car[i][1] >= M) {  // Такой автомобиль отправляется на рассмотрение
+			float V = car[i][3], R = car[i][2]; float S = V / R; S *= 100;
+			F(towndep, 0, townarr, table, count_town, S);
+			int min[2]{ INT_MAX, 0 };
+			int k = 0;
+			bool OK = true;
+			do {
+				OK = true;
+				for (int j = 0; j < (I + k); j++) {
+					if (pathx[j][11] > pathx[j + 1][11] && pathx[j + 1][11] != 0 && pathx[j][11] != 0) { OK = false; break; }
+				}
+				if (OK == true) break;
+				min[0] = INT_MAX; min[1] = 0;
+				for (int j = k; j < I; j++) {
+					if (min[0] > pathx[j][11] && pathx[j][11] != 0) { min[0] = pathx[j][11]; min[1] = j; }
+				}
+				for (int j = I + k; j >= k; j--) {
+					for (int f = 0; f < 12; f++) pathx[j + 1][f] = pathx[j][f];
+				}
+				for (int f = 0; f < 12; f++) { pathx[k][f] = pathx[min[1] + 1][f]; pathx[min[1] + 1][f] = 0; }
+				k++;
+				for (int j = 0; j < I + k; j++) {
+					if (pathx[j][11] == 0 && pathx[j+1][11] != 0) {
+						for (int l = j; l < I + k; l++) {
+							for (int f = 0; f < 12; f++) { pathx[l][f] = pathx[l + 1][f]; pathx[l + 1][f] = 0; }
+						}
+					}
+				}
+			} while (OK == false);
+			if (I > 0) {
+				cout << i << ". Автомобиль " << car[i][0] << "" << endl;
+			}
+		}
+	}
+}
+int main() {
+	SetConsoleCP(1251); SetConsoleOutputCP(1251);
+	int A = 1, B = 7, count_town = 7, count_car = 1;
+	short settings[2]{ 0,0 };
+	int	table[8][1500]{ {0,1,2,3,4,5,6,7},  // По умолчанию массив table может иметь до 1500 городов (учитываемых при построении маршрута)
+			{1,-1,210,480,650,180,520,700},
+			{2,210,-1,275,450,240,560,830},
+			{3,480,275,-1,180,510,400,570},
+			{4,650,450,180,-1,680,500,500},
+			{5,180,240,510,680,-1,350,530},
+			{6,520,560,400,500,350,-1,180},
+			{7,700,830,570,500,530,180,-1}
+	};
+	int car[1][5]{ {15723,1000,9,400,0}
+
+	};
+	Route_s(A, B, table, count_town, car, count_car, settings);
+	system("pause"); return 0;
+}
